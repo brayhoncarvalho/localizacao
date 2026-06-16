@@ -54,6 +54,8 @@ document.addEventListener('DOMContentLoaded', () => {
   gatherWebRTCIPs();
   fetchIPLocation();
   requestGPS();
+  renderDeviceCard();
+  renderNetInfoCard();
 });
 
 // Atualiza IP automaticamente quando a rede mudar
@@ -120,13 +122,37 @@ function gatherWebRTCIPs() {
 
 async function fetchIPLocation() {
   try {
-    const res = await fetch(IP_API_URL, { cache: 'no-store' });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    // Timeout de 8s para evitar spinner infinito
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
 
-    const raw = await res.json();
-    if (!raw.success) throw new Error(raw.message || 'Falha na API');
+    let raw;
+    try {
+      const res = await fetch(IP_API_URL, { cache: 'no-store', signal: ctrl.signal });
+      clearTimeout(timer);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      raw = await res.json();
+      if (!raw.success) throw new Error(raw.message || 'Falha na API principal');
+    } catch (primaryErr) {
+      // Fallback: ipapi.co (HTTPS, gratuito)
+      console.warn('ipwho.is falhou, tentando fallback ipapi.co:', primaryErr.message);
+      const res2 = await fetch('https://ipapi.co/json/', { cache: 'no-store' });
+      if (!res2.ok) throw new Error(`Fallback HTTP ${res2.status}`);
+      const fb = await res2.json();
+      if (fb.error) throw new Error(fb.reason || 'Fallback falhou');
+      // Normaliza ipapi.co para o mesmo formato
+      raw = {
+        success: true, ip: fb.ip,
+        country: fb.country_name, country_code: fb.country_code,
+        region: fb.region, city: fb.city, postal: fb.postal,
+        latitude: fb.latitude, longitude: fb.longitude,
+        timezone: { id: fb.timezone },
+        connection: { isp: fb.org, org: fb.org, asn: null },
+        security: { proxy: false, hosting: false, vpn: false, tor: false },
+        _fallback: true,
+      };
+    }
 
-    // Normaliza campos do ipwho.is para o formato usado pelo restante do código
     const data = {
       query:       raw.ip,
       country:     raw.country,
@@ -140,11 +166,11 @@ async function fetchIPLocation() {
       isp:         raw.connection?.isp,
       org:         raw.connection?.org,
       as:          raw.connection?.asn ? `AS${raw.connection.asn} ${raw.connection.org}` : '',
-      proxy:       raw.security?.proxy  ?? false,
+      proxy:       raw.security?.proxy   ?? false,
       hosting:     raw.security?.hosting ?? false,
-      // Sinais extras exclusivos do ipwho.is
-      vpnFlag:     raw.security?.vpn    ?? false,
-      torFlag:     raw.security?.tor    ?? false,
+      vpnFlag:     raw.security?.vpn     ?? false,
+      torFlag:     raw.security?.tor     ?? false,
+      _fallback:   raw._fallback ?? false,
     };
 
     state.ipData = data;
@@ -189,10 +215,6 @@ function refreshIP() {
     `<div class="loading-state">` +
     `<div class="spinner spinner--sm"></div>` +
     `<span>Atualizando IP…</span></div>`;
-  document.getElementById('networkBody').innerHTML =
-    `<div class="loading-state">` +
-    `<div class="spinner spinner--sm"></div>` +
-    `<span>Analisando rede…</span></div>`;
   setBadge('ipBadge', '', '');
   fetchIPLocation();
 }
@@ -730,6 +752,150 @@ function updateSummary() {
 /* ─────────────────────────────────────────────────────────────────────────────
  * UTILITIES
  * ───────────────────────────────────────────────────────────────────────────── */
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * RENDER — Device Card
+ * ───────────────────────────────────────────────────────────────────────────── */
+
+function renderDeviceCard() {
+  // ── User Agent parsing ───────────────────────────────────────────────────
+  const ua  = navigator.userAgent;
+  let browser = 'Desconhecido', browserVer = '', os = 'Desconhecido';
+
+  // Browser
+  if (/Edg\/(\S+)/.test(ua))            { browser = 'Microsoft Edge';  browserVer = RegExp.$1; }
+  else if (/Chrome\/(\S+)/.test(ua))    { browser = 'Chrome';          browserVer = RegExp.$1; }
+  else if (/Firefox\/(\S+)/.test(ua))   { browser = 'Firefox';         browserVer = RegExp.$1; }
+  else if (/Safari\/(\S+)/.test(ua) && !/Chrome/.test(ua)) {
+    browser = 'Safari';
+    const m = ua.match(/Version\/(\S+)/);
+    browserVer = m ? m[1] : '';
+  } else if (/OPR\/(\S+)|Opera\/(\S+)/.test(ua)) { browser = 'Opera'; browserVer = RegExp.$1 || RegExp.$2; }
+
+  // OS
+  if (/Windows NT 10\.0/.test(ua))      os = 'Windows 10 / 11';
+  else if (/Windows NT 6\.3/.test(ua))  os = 'Windows 8.1';
+  else if (/Windows NT 6\.1/.test(ua))  os = 'Windows 7';
+  else if (/Windows/.test(ua))          os = 'Windows';
+  else if (/Android (\d+[\.\d]*)/.test(ua)) os = `Android ${RegExp.$1}`;
+  else if (/iPhone OS ([\d_]+)/.test(ua))   os = `iOS ${RegExp.$1.replace(/_/g,'.')}`;
+  else if (/iPad.*OS ([\d_]+)/.test(ua))    os = `iPadOS ${RegExp.$1.replace(/_/g,'.')}`;
+  else if (/Mac OS X ([\d_]+)/.test(ua))    os = `macOS ${RegExp.$1.replace(/_/g,'.')}`;
+  else if (/Linux/.test(ua))            os = 'Linux';
+
+  // ── Hardware ─────────────────────────────────────────────────────────────
+  const cores  = navigator.hardwareConcurrency || '—';
+  const ram    = navigator.deviceMemory        ? `~${navigator.deviceMemory} GB` : '—';
+  const touch  = navigator.maxTouchPoints > 0 ? `Sim (${navigator.maxTouchPoints} pontos)` : 'Não';
+  const lang   = navigator.language || '—';
+  const langs  = navigator.languages ? navigator.languages.join(', ') : lang;
+  const dpr    = window.devicePixelRatio || 1;
+  const screen_info = `${screen.width} × ${screen.height} px (DPR ${dpr.toFixed(1)})`;
+  const colorDepth  = `${screen.colorDepth}-bit`;
+  const cookiesOk   = navigator.cookieEnabled ? 'Habilitados' : 'Desabilitados';
+  const doNotTrack  = navigator.doNotTrack === '1' ? 'Ativado' : navigator.doNotTrack === '0' ? 'Desativado' : 'Não definido';
+
+  document.getElementById('deviceBody').innerHTML = `
+    <div class="data-grid data-grid--wide">
+      <div class="data-item">
+        <span class="data-label">Navegador</span>
+        <span class="data-value">${escHtml(browser)} <span class="data-value--mono" style="font-size:.76rem">${escHtml(browserVer)}</span></span>
+      </div>
+      <div class="data-item">
+        <span class="data-label">Sistema Operacional</span>
+        <span class="data-value">${escHtml(os)}</span>
+      </div>
+      <div class="data-item">
+        <span class="data-label">CPU (threads)</span>
+        <span class="data-value">${escHtml(String(cores))}</span>
+      </div>
+      <div class="data-item">
+        <span class="data-label">RAM (aproximada)</span>
+        <span class="data-value">${escHtml(ram)}</span>
+      </div>
+      <div class="data-item">
+        <span class="data-label">Resolução / DPR</span>
+        <span class="data-value data-value--mono">${escHtml(screen_info)}</span>
+      </div>
+      <div class="data-item">
+        <span class="data-label">Profundidade de cor</span>
+        <span class="data-value">${escHtml(colorDepth)}</span>
+      </div>
+      <div class="data-item">
+        <span class="data-label">Toque</span>
+        <span class="data-value">${escHtml(touch)}</span>
+      </div>
+      <div class="data-item">
+        <span class="data-label">Cookies</span>
+        <span class="data-value">${escHtml(cookiesOk)}</span>
+      </div>
+      <div class="data-item">
+        <span class="data-label">Idioma(s)</span>
+        <span class="data-value">${escHtml(langs)}</span>
+      </div>
+      <div class="data-item">
+        <span class="data-label">Do Not Track</span>
+        <span class="data-value">${escHtml(doNotTrack)}</span>
+      </div>
+      <div class="data-item data-item--full">
+        <span class="data-label">User Agent</span>
+        <span class="data-value data-value--mono" style="font-size:.72rem;word-break:break-all">${escHtml(ua)}</span>
+      </div>
+    </div>`;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * RENDER — Net Info Card (Network Information API — suporte parcial)
+ * ───────────────────────────────────────────────────────────────────────────── */
+
+function renderNetInfoCard() {
+  const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+
+  if (!conn) {
+    document.getElementById('netInfoBody').innerHTML =
+      `<p class="note">A Network Information API não é suportada por este navegador (Chrome/Edge Android têm suporte completo; Safari/Firefox têm suporte limitado).</p>`;
+    return;
+  }
+
+  const typeLabel = { wifi: 'Wi-Fi', cellular: 'Celular/Móvel', ethernet: 'Ethernet / Cabeada',
+                      bluetooth: 'Bluetooth', wimax: 'WiMAX', other: 'Outro', none: 'Sem conexão', unknown: 'Desconhecido' };
+
+  const type      = typeLabel[conn.type] || conn.type || '—';
+  const eff       = conn.effectiveType ? conn.effectiveType.toUpperCase() : '—';
+  const downlink  = conn.downlink  != null ? `${conn.downlink} Mbps` : '—';
+  const rtt       = conn.rtt       != null ? `${conn.rtt} ms`  : '—';
+  const saveData  = conn.saveData  ? '<span class="pill pill--yellow">Economia de dados ativada</span>' : '<span class="pill pill--green">Normal</span>';
+
+  const updateUI = () => {
+    document.getElementById('netInfoBody').innerHTML = `
+      <div class="data-grid">
+        <div class="data-item">
+          <span class="data-label">Tipo de rede</span>
+          <span class="data-value">${escHtml(type)}</span>
+        </div>
+        <div class="data-item">
+          <span class="data-label">Qualidade efetiva</span>
+          <span class="data-value data-value--mono">${escHtml(eff)}</span>
+        </div>
+        <div class="data-item">
+          <span class="data-label">Velocidade estimada</span>
+          <span class="data-value">${escHtml(downlink)}</span>
+        </div>
+        <div class="data-item">
+          <span class="data-label">Latência estimada (RTT)</span>
+          <span class="data-value">${escHtml(rtt)}</span>
+        </div>
+        <div class="data-item data-item--full">
+          <span class="data-label">Modo dados</span>
+          <span class="data-value">${saveData}</span>
+        </div>
+      </div>`;
+  };
+
+  updateUI();
+  // Atualiza se a conexão mudar
+  conn.addEventListener('change', updateUI);
+}
 
 /** Retorna true se o IP for privado/loopback/link-local. */
 function isPrivateIP(ip) {
