@@ -33,6 +33,13 @@ window.addEventListener('online', () => {
   refreshIP();
 });
 
+// Detecta retorno à aba (ex: usuário trocou VPN em outro app e voltou)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && !state.ipData) {
+    refreshIP();
+  }
+});
+
 /* ─────────────────────────────────────────────────────────────────────────────
  * IP LOCATION
  * Tenta 3 APIs em cascata para máxima compatibilidade (mobile, Safari, etc.)
@@ -118,7 +125,22 @@ async function fetchIPLocation() {
     }
   }
 
-  // Todas falharam
+  // Todas falharam — tenta uma vez mais após 5s antes de exibir erro
+  renderIPRetrying();
+  await new Promise(r => setTimeout(r, 5000));
+  for (const attempt of apis) {
+    try {
+      const data = await attempt();
+      state.ipData = data;
+      renderIPCard(data);
+      updateSummary();
+      return;
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+
+  // Após retry também falhou
   renderIPError(lastErr?.message || 'Todas as APIs falharam');
 }
 
@@ -288,6 +310,14 @@ function renderIPCard(d) {
     </div>`;
 
   setBadge('ipBadge', 'green', 'Obtido');
+}
+
+function renderIPRetrying() {
+  document.getElementById('ipBody').innerHTML =
+    `<div class="loading-state">` +
+    `<div class="spinner spinner--sm"></div>` +
+    `<span>Rede instável, tentando novamente em 5s…</span></div>`;
+  setBadge('ipBadge', 'yellow', 'Reconectando');
 }
 
 function renderIPError(msg) {
