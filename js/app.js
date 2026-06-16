@@ -39,16 +39,10 @@ window.addEventListener('online', () => {
  * ───────────────────────────────────────────────────────────────────────────── */
 
 async function fetchWithTimeout(url, ms) {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), ms);
-  try {
-    const res = await fetch(url, { cache: 'no-store', signal: ctrl.signal });
-    clearTimeout(timer);
-    return res;
-  } catch (e) {
-    clearTimeout(timer);
-    throw e;
-  }
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('timeout')), ms)
+  );
+  return Promise.race([fetch(url, { cache: 'no-store' }), timeout]);
 }
 
 async function fetchIPLocation() {
@@ -68,7 +62,22 @@ async function fetchIPLocation() {
         as: r.connection?.asn ? `AS${r.connection.asn}` : '',
       };
     },
-    // 2ª opção: ipapi.co
+    // 2ª opção: ipinfo.io (excelente suporte iOS/Safari)
+    async () => {
+      const res = await fetchWithTimeout('https://ipinfo.io/json', 10000);
+      if (!res.ok) throw new Error(`ipinfo.io HTTP ${res.status}`);
+      const r = await res.json();
+      if (r.bogon) throw new Error('ipinfo.io: IP privado/bogon');
+      const [lat, lon] = (r.loc || ',').split(',').map(Number);
+      return {
+        query: r.ip, country: r.country, countryCode: r.country,
+        regionName: r.region, city: r.city, zip: r.postal,
+        lat: isNaN(lat) ? null : lat, lon: isNaN(lon) ? null : lon,
+        timezone: r.timezone,
+        isp: r.org || '', org: r.org || '', as: '',
+      };
+    },
+    // 3ª opção: ipapi.co
     async () => {
       const res = await fetchWithTimeout('https://ipapi.co/json/', 10000);
       if (!res.ok) throw new Error(`ipapi.co HTTP ${res.status}`);
@@ -81,7 +90,7 @@ async function fetchIPLocation() {
         isp: r.org || '', org: r.org || '', as: r.asn || '',
       };
     },
-    // 3ª opção: freeipapi.com
+    // 4ª opção: freeipapi.com
     async () => {
       const res = await fetchWithTimeout('https://freeipapi.com/api/json', 10000);
       if (!res.ok) throw new Error(`freeipapi HTTP ${res.status}`);
