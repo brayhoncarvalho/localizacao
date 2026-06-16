@@ -4,15 +4,8 @@
  * CONFIG
  * ───────────────────────────────────────────────────────────────────────────── */
 
-const IP_API_FIELDS = [
-  'status', 'message',
-  'country', 'countryCode', 'regionName', 'city', 'zip',
-  'lat', 'lon', 'timezone',
-  'isp', 'org', 'as',
-  'proxy', 'hosting', 'query',
-].join(',');
-
-const IP_API_URL    = `http://ip-api.com/json/?fields=${IP_API_FIELDS}`;
+// ipwho.is — HTTPS, gratuito, sem chave de API
+const IP_API_URL    = 'https://api.ipwho.is/';
 const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/reverse';
 
 /**
@@ -127,12 +120,32 @@ function gatherWebRTCIPs() {
 
 async function fetchIPLocation() {
   try {
-    // cache: 'no-store' garante que o browser nunca sirva resposta em cache
     const res = await fetch(IP_API_URL, { cache: 'no-store' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-    const data = await res.json();
-    if (data.status !== 'success') throw new Error(data.message || 'Falha na API');
+    const raw = await res.json();
+    if (!raw.success) throw new Error(raw.message || 'Falha na API');
+
+    // Normaliza campos do ipwho.is para o formato usado pelo restante do código
+    const data = {
+      query:       raw.ip,
+      country:     raw.country,
+      countryCode: raw.country_code,
+      regionName:  raw.region,
+      city:        raw.city,
+      zip:         raw.postal,
+      lat:         raw.latitude,
+      lon:         raw.longitude,
+      timezone:    raw.timezone?.id,
+      isp:         raw.connection?.isp,
+      org:         raw.connection?.org,
+      as:          raw.connection?.asn ? `AS${raw.connection.asn} ${raw.connection.org}` : '',
+      proxy:       raw.security?.proxy  ?? false,
+      hosting:     raw.security?.hosting ?? false,
+      // Sinais extras exclusivos do ipwho.is
+      vpnFlag:     raw.security?.vpn    ?? false,
+      torFlag:     raw.security?.tor    ?? false,
+    };
 
     state.ipData = data;
     renderIPCard(data);
@@ -306,6 +319,24 @@ function recalcVPN() {
   const ispRawAll = [d.isp, d.org, d.as].filter(Boolean).join(' ').toLowerCase();
   const corpMatch = CORPORATE_SECURITY_KEYWORDS.find(k => ispRawAll.includes(k));
   const isCorporateCtx = !!corpMatch;
+
+  // ── Signal 0a: VPN flag direto (ipwho.is) ───────────────────────────────
+  if (d.vpnFlag === true) {
+    signals.push({
+      label:    'Campo <code>security.vpn=true</code> (ipwho.is) — IP classificado como VPN pela base de dados',
+      severity: 'red', points: 50,
+    });
+    score += 50;
+  }
+
+  // ── Signal 0b: Tor exit node ─────────────────────────────────────────────
+  if (d.torFlag === true) {
+    signals.push({
+      label:    'Campo <code>security.tor=true</code> (ipwho.is) — IP é nó de saída da rede Tor',
+      severity: 'red', points: 50,
+    });
+    score += 50;
+  }
 
   // ── Signal 1: proxy flag ────────────────────────────────────────────────
   if (d.proxy === true) {
@@ -535,8 +566,7 @@ function renderIPError(msg) {
     `<span class="error-icon">⚠️</span>` +
     `<div><strong>Não foi possível obter dados de IP</strong>` +
     `<p>${escHtml(msg)}</p>` +
-    `<p class="note">ip-api.com opera apenas via HTTP (tier gratuito). Se a página estiver sendo servida via HTTPS, o navegador bloqueará a requisição por mixed-content. Abra o arquivo localmente (file://) ou sirva via HTTP.</p>` +
-    `<button class="btn-secondary" onclick="location.reload()">↻ Tentar novamente</button>` +
+    `<button class="btn-secondary" onclick="refreshIP()">\u21bb Tentar novamente</button>` +
     `</div></div>`;
 
   setBadge('ipBadge', 'red', 'Erro');
