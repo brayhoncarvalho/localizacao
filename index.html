@@ -18,7 +18,7 @@
           </svg>
           <div>
             <h1>Análise de Geolocalização</h1>
-            <p class="header-subtitle">Diagnóstico preciso de localização e detecção de anonimizadores</p>
+            <p class="header-subtitle">Diagnóstico de localização via GPS e IP</p>
           </div>
         </div>
         <div class="privacy-notice">
@@ -88,10 +88,9 @@
 
       </div><!-- /grid-main -->
 
-      <!-- Middle: Dispositivo + Rede -->
+      <!-- Dispositivo (full-width) -->
       <div class="grid-device">
 
-        <!-- Device Card -->
         <div class="card" id="deviceCard">
           <div class="card-header">
             <div class="card-title">
@@ -107,52 +106,13 @@
           </div>
         </div>
 
-        <!-- Network Info Card -->
-        <div class="card" id="netInfoCard">
-          <div class="card-header">
-            <div class="card-title">
-              <span class="card-icon">📡</span>
-              <h2>Conexão de Rede</h2>
-            </div>
-          </div>
-          <div class="card-body" id="netInfoBody">
-            <div class="loading-state">
-              <div class="spinner spinner--sm"></div>
-              <span>Coletando dados…</span>
-            </div>
-          </div>
-        </div>
-
       </div><!-- /grid-device -->
-
-      <!-- Bottom: VPN full-width -->
-      <div class="grid-bottom">
-
-        <!-- VPN Card -->
-        <div class="card" id="vpnCard">
-          <div class="card-header">
-            <div class="card-title">
-              <span class="card-icon">🛡️</span>
-              <h2>Análise VPN / Proxy</h2>
-            </div>
-            <span class="badge" id="vpnBadge"></span>
-          </div>
-          <div class="card-body" id="vpnBody">
-            <div class="loading-state">
-              <div class="spinner spinner--sm"></div>
-              <span>Aguardando dados de IP…</span>
-            </div>
-          </div>
-        </div>
-
-      </div><!-- /grid-bottom -->
     </main><!-- /dashboard -->
 
     <footer class="app-footer">
       <p>
         Dados via <a href="https://ipwho.is" target="_blank" rel="noopener noreferrer">ipwho.is</a> ·
-        <a href="https://nominatim.openstreetmap.org" target="_blank" rel="noopener noreferrer">Nominatim / OSM</a> ·
-        Precisão VPN ~80% (API gratuita)
+        <a href="https://nominatim.openstreetmap.org" target="_blank" rel="noopener noreferrer">Nominatim / OSM</a>
       </p>
     </footer>
 

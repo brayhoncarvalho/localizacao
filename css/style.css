@@ -213,15 +213,9 @@ body {
   margin-bottom: 1.5rem;
 }
 
-.grid-bottom {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 1.5rem;
-}
-
 .grid-device {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 1.5rem;
   margin-bottom: 1.5rem;
 }
@@ -495,135 +489,6 @@ body {
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── VPN Score ─────────────────────────────────────────────────────────────── */
-.vpn-score-section { margin-bottom: 1.25rem; }
-
-.score-bar-wrapper {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.score-bar {
-  height: 10px;
-  background: var(--bg-surface);
-  border-radius: 100px;
-  overflow: hidden;
-  border: 1px solid var(--border-subtle);
-}
-
-.score-fill {
-  height: 100%;
-  border-radius: 100px;
-  transition: width .9s cubic-bezier(.4, 0, .2, 1);
-}
-.score-fill--green  { background: linear-gradient(90deg, #3fb950, #52d965); }
-.score-fill--yellow { background: linear-gradient(90deg, #d29922, #f0b429); }
-.score-fill--red    { background: linear-gradient(90deg, #f85149, #ff6961); }
-
-.score-info {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.score-number {
-  font-size: 2rem;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-  font-family: 'SF Mono', 'Cascadia Code', Consolas, monospace;
-}
-.score-unit {
-  font-size: 0.9rem;
-  font-weight: 400;
-  color: var(--text-secondary);
-}
-.score-number--green  { color: var(--green); }
-.score-number--yellow { color: var(--yellow); }
-.score-number--red    { color: var(--red); }
-
-.score-label {
-  font-size: 0.9rem;
-  font-weight: 700;
-}
-.score-label--green  { color: var(--green); }
-.score-label--yellow { color: var(--yellow); }
-.score-label--red    { color: var(--red); }
-
-/* ── Signal List ───────────────────────────────────────────────────────────── */
-.vpn-signals { margin-bottom: 1rem; }
-
-.vpn-signals h3 {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: .09em;
-  margin-bottom: 10px;
-}
-
-.signal-list {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.signal-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 7px 10px;
-  border-radius: var(--radius-xs);
-  font-size: 0.8rem;
-  line-height: 1.5;
-  border-left: 3px solid transparent;
-}
-.signal-item--green  { background: var(--green-bg);  border-left-color: var(--green); }
-.signal-item--yellow { background: var(--yellow-bg); border-left-color: var(--yellow); }
-.signal-item--red    { background: var(--red-bg);    border-left-color: var(--red); }
-.signal-item--gray   { background: var(--gray-bg);   border-left-color: var(--text-muted); }
-
-.signal-dot {
-  width: 8px; height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  margin-top: 5px;
-}
-.signal-dot--green  { background: var(--green); }
-.signal-dot--yellow { background: var(--yellow); }
-.signal-dot--red    { background: var(--red); }
-.signal-dot--gray   { background: var(--text-muted); }
-
-.signal-text { flex: 1; color: var(--text-primary); }
-.signal-text code {
-  font-family: 'SF Mono', 'Cascadia Code', Consolas, monospace;
-  font-size: 0.76em;
-  background: var(--bg-surface);
-  padding: 0 4px;
-  border-radius: 3px;
-}
-
-.signal-points {
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: var(--red);
-  white-space: nowrap;
-  font-family: 'SF Mono', Consolas, monospace;
-}
-
-.vpn-disclaimer {
-  font-size: 0.76rem;
-  color: var(--text-muted);
-  line-height: 1.55;
-}
-
-.vpn-disclaimer a { color: var(--text-secondary); }
-.vpn-disclaimer a:hover { color: var(--blue); }
-
 /* ── Footer ────────────────────────────────────────────────────────────────── */
 .app-footer {
   margin-top: 2.5rem;
@@ -704,6 +569,4 @@ body {
   }
 
   .summary-location { font-size: 1.1rem; }
-
-  .score-number { font-size: 1.5rem; }
 }
