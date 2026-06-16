@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Análise de Geolocalização</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="app">
+
+    <!-- ── Header ───────────────────────────────────────────────── -->
+    <header class="app-header">
+      <div class="header-inner">
+        <div class="header-brand">
+          <svg class="header-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+            <path fill-rule="evenodd" d="M11.54 22.351l.07.04.028.016a.76.76 0 00.723 0l.028-.015.071-.041a16.975 16.975 0 001.144-.742 19.58 19.58 0 002.683-2.282c1.944-2.013 3.906-5.08 3.906-9.327A7.5 7.5 0 0012 2.25a7.5 7.5 0 00-7.5 7.5c0 4.247 1.961 7.314 3.905 9.327a19.575 19.575 0 002.684 2.282 16.975 16.975 0 001.144.742zM12 13.5a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd" />
+          </svg>
+          <div>
+            <h1>Análise de Geolocalização</h1>
+            <p class="header-subtitle">Diagnóstico preciso de localização e detecção de anonimizadores</p>
+          </div>
+        </div>
+        <div class="privacy-notice">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="13" height="13">
+            <path fill-rule="evenodd" d="M12 1.5a5.25 5.25 0 00-5.25 5.25v3a3 3 0 00-3 3v6.75a3 3 0 003 3h10.5a3 3 0 003-3v-6.75a3 3 0 00-3-3v-3c0-2.9-2.35-5.25-5.25-5.25zm3.75 8.25v-3a3.75 3.75 0 10-7.5 0v3h7.5z" clip-rule="evenodd" />
+          </svg>
+          <span>Dados não armazenados nem transmitidos a servidores próprios</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ── Dashboard ─────────────────────────────────────────────── -->
+    <main class="dashboard">
+
+      <!-- Summary Banner -->
+      <div class="summary-banner" id="summaryBanner">
+        <div id="summaryLoading" class="summary-loading">
+          <div class="spinner spinner--sm"></div>
+          <span>Analisando localização…</span>
+        </div>
+        <div id="summaryContent" class="summary-content hidden">
+          <div class="summary-pin">📍</div>
+          <div class="summary-text">
+            <span class="summary-label">Este usuário está localizado em</span>
+            <span class="summary-location" id="summaryLocation">—</span>
+          </div>
+          <div class="summary-meta" id="summaryMeta"></div>
+        </div>
+      </div>
+
+      <!-- Cards: GPS + IP lado a lado -->
+      <div class="grid-main">
+
+          <!-- GPS Card -->
+          <div class="card" id="gpsCard">
+            <div class="card-header">
+              <div class="card-title">
+                <span class="card-icon">📍</span>
+                <h2>Localização GPS</h2>
+              </div>
+              <span class="badge" id="gpsBadge"></span>
+            </div>
+            <div class="card-body" id="gpsBody">
+              <div class="loading-state">
+                <div class="spinner spinner--sm"></div>
+                <span>Aguardando autorização de localização…</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- IP Card -->
+          <div class="card" id="ipCard">
+            <div class="card-header">
+              <div class="card-title">
+                <span class="card-icon">🌐</span>
+                <h2>Localização por IP</h2>
+              </div>
+              <span class="badge" id="ipBadge"></span>
+            </div>
+            <div class="card-body" id="ipBody">
+              <div class="loading-state">
+                <div class="spinner spinner--sm"></div>
+                <span>Obtendo dados de IP…</span>
+              </div>
+            </div>
+          </div>
+
+      </div><!-- /grid-main -->
+
+      <!-- Bottom: VPN full-width -->
+      <div class="grid-bottom">
+
+        <!-- VPN Card -->
+        <div class="card" id="vpnCard">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="card-icon">🛡️</span>
+              <h2>Análise VPN / Proxy</h2>
+            </div>
+            <span class="badge" id="vpnBadge"></span>
+          </div>
+          <div class="card-body" id="vpnBody">
+            <div class="loading-state">
+              <div class="spinner spinner--sm"></div>
+              <span>Aguardando dados de IP…</span>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /grid-bottom -->
+    </main><!-- /dashboard -->
+
+    <footer class="app-footer">
+      <p>
+        Dados via <a href="http://ip-api.com" target="_blank" rel="noopener noreferrer">ip-api.com</a> ·
+        <a href="https://nominatim.openstreetmap.org" target="_blank" rel="noopener noreferrer">Nominatim / OSM</a> ·
+        Mapas <a href="https://leafletjs.com" target="_blank" rel="noopener noreferrer">Leaflet</a> +
+        <a href="https://openstreetmap.org" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> ·
+        Precisão VPN ~80% (API gratuita)
+      </p>
+    </footer>
+
+  </div><!-- /app -->
+
+  <script src="js/app.js"></script>
+</body>
+</html>
