@@ -363,18 +363,27 @@ function renderGPSCard(coords, nominatim) {
   let addressRow = '';
   if (nominatim && nominatim.address) {
     const a = nominatim.address;
-    const parts = [
-      a.road,
-      a.suburb || a.neighbourhood,
-      a.city || a.town || a.village || a.municipality,
-      a.state,
-      a.postcode,
-      a.country,
-    ].filter(Boolean);
+
+    // Bairro e CEP do OSM são frequentemente incorretos no Brasil —
+    // exibimos apenas os campos de alta confiança (rua, cidade, estado, país)
+    const street = [a.house_number, a.road].filter(Boolean).join(', ');
+    const city   = a.city || a.town || a.village || a.municipality || a.county || '';
+    const parts  = [street, city, a.state, a.country].filter(Boolean);
+
+    // CEP e bairro exibidos separadamente com aviso de baixa confiança
+    const bairro = a.suburb || a.neighbourhood || '';
+    const cep    = a.postcode || '';
+
+    const extraRows = [
+      bairro ? `<div class="data-item"><span class="data-label">Bairro <span style="font-size:.65rem;color:var(--yellow)" title="Dado OSM pode estar desatualizado">⚠ OSM</span></span><span class="data-value">${escHtml(bairro)}</span></div>` : '',
+      cep    ? `<div class="data-item"><span class="data-label">CEP <span style="font-size:.65rem;color:var(--yellow)" title="Dado OSM pode estar desatualizado">⚠ OSM</span></span><span class="data-value data-value--mono">${escHtml(cep)}</span></div>` : '',
+    ].join('');
+
     addressRow =
       `<div class="data-item data-item--full">` +
       `<span class="data-label">Endereço (Nominatim / OSM)</span>` +
-      `<span class="data-value">${escHtml(parts.join(', '))}</span></div>`;
+      `<span class="data-value">${escHtml(parts.join(', '))}</span></div>` +
+      extraRows;
   }
 
   const altRow = (coords.altitude !== null && coords.altitude !== undefined)
