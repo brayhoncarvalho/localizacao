@@ -489,6 +489,111 @@ body {
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ── Fingerprint Card ──────────────────────────────────────────────────────── */
+.fp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.fp-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fp-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.fp-value {
+  font-size: 0.84rem;
+  color: var(--text-primary);
+  font-weight: 500;
+  word-break: break-all;
+}
+
+.fp-value--mono {
+  font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace;
+  font-size: 0.75rem;
+  color: var(--blue);
+  letter-spacing: .02em;
+}
+
+.fp-value--full { grid-column: 1 / -1; }
+
+.fp-hash-row {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px 1.25rem;
+}
+
+.fp-section-title {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .09em;
+  margin: 1rem 0 .6rem;
+  padding-bottom: .4rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.fp-sensor-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: var(--radius-xs);
+  background: var(--bg-surface);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.fp-sensor-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.fp-sensor-dot--green  { background: var(--green); }
+.fp-sensor-dot--yellow { background: var(--yellow); }
+.fp-sensor-dot--red    { background: var(--red); }
+.fp-sensor-dot--gray   { background: var(--text-muted); }
+
+.fp-audit-box {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 0.75rem;
+  font-family: 'SF Mono', 'Cascadia Code', Consolas, monospace;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  word-break: break-all;
+}
+
+.fp-audit-box strong {
+  color: var(--text-primary);
+  font-size: 0.72rem;
+  display: block;
+  margin-bottom: 6px;
+  font-family: inherit;
+}
+
+@media (max-width: 768px) {
+  .fp-hash-row { grid-template-columns: 1fr; }
+}
+
 /* ── Footer ────────────────────────────────────────────────────────────────── */
 .app-footer {
   margin-top: 2.5rem;

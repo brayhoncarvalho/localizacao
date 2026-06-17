@@ -26,6 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchIPLocation();
   requestGPS();
   renderDeviceCard();
+  renderFingerprintCard();
 });
 
 // Atualiza IP automaticamente quando a rede mudar
@@ -432,7 +433,114 @@ function updateSummary() {
  * RENDER — Device Card
  * ───────────────────────────────────────────────────────────────────────────── */
 
-function renderDeviceCard() {
+/* ─────────────────────────────────────────────────────────────────────────────
+ * DEVICE MODEL DETECTION
+ * Combina UA · userAgentData · platform · screen · DPR · maxTouchPoints · cores
+ * ───────────────────────────────────────────────────────────────────────────── */
+
+async function detectDeviceModel() {
+  const ua    = navigator.userAgent;
+  const w     = screen.width;
+  const h     = screen.height;
+  const dpr   = window.devicePixelRatio || 1;
+  const cores = navigator.hardwareConcurrency || 0;
+  const touch = navigator.maxTouchPoints || 0;
+  const plat  = navigator.platform || '';
+
+  // ── Android: Client Hints (Chrome 90+) — retorna modelo exato ────────────
+  if (/Android/i.test(ua) && navigator.userAgentData) {
+    try {
+      const hints = await navigator.userAgentData.getHighEntropyValues(
+        ['model', 'platform', 'platformVersion']
+      );
+      if (hints.model && hints.model.trim() !== '') {
+        return { model: hints.model.trim(), confidence: 'Alta', method: 'Client Hints (exato)' };
+      }
+    } catch (_) { /* fallback abaixo */ }
+  }
+
+  // ── Android: parse do User-Agent ─────────────────────────────────────────
+  if (/Android/i.test(ua)) {
+    // Padrão: "Android X.X; ModeloAqui Build/" ou "Android X.X; ModeloAqui)"
+    const m = ua.match(/Android[\s\/][\d.]+;\s*([^)]+?)\s*(?:Build\/|[);])/);
+    if (m && m[1]) {
+      const raw = m[1].trim();
+      if (!/^(Linux|Android|Mobile|K|)$/.test(raw)) {
+        return { model: raw, confidence: 'Média', method: 'User-Agent' };
+      }
+    }
+    return { model: 'Android — modelo não exposto pelo browser', confidence: 'Baixa', method: 'User-Agent' };
+  }
+
+  // ── iPad (iPadOS 13+ reporta "Macintosh" no UA — detecta por touch) ───────
+  const isIpad = /iPad/i.test(ua) || (/Macintosh/i.test(ua) && touch >= 4);
+  if (isIpad) {
+    return { model: _detectIpad(Math.min(w,h), Math.max(w,h), dpr), confidence: 'Média', method: 'Resolução + DPR' };
+  }
+
+  // ── iPhone / iPod ─────────────────────────────────────────────────────────
+  if (/iPhone|iPod/i.test(ua)) {
+    return { model: _detectIphone(Math.min(w,h), Math.max(w,h), dpr, cores), confidence: 'Média', method: 'Resolução + DPR + CPU' };
+  }
+
+  // ── Desktop ───────────────────────────────────────────────────────────────
+  if (/Win/i.test(plat))   return { model: 'PC / Notebook (Windows)', confidence: 'Baixa', method: 'Platform' };
+  if (/Mac/i.test(plat))   return { model: 'Mac / MacBook', confidence: 'Baixa', method: 'Platform' };
+  if (/Linux/i.test(plat)) return { model: 'PC / Notebook (Linux)',   confidence: 'Baixa', method: 'Platform' };
+
+  return { model: 'Desconhecido', confidence: 'Baixa', method: '—' };
+}
+
+/** Tabela iPhone: [largura-retrato, altura-retrato, DPR, cores-mín, rótulo] */
+function _detectIphone(pw, ph, dpr, cores) {
+  const d = Math.round(dpr);
+  // [pw, ph, dpr, minCores, label]
+  const T = [
+    [320, 480,  2, 0, 'iPhone 4 / 4s'],
+    [320, 568,  2, 0, 'iPhone 5 / 5s / SE (1ª geração)'],
+    [375, 667,  2, 0, 'iPhone 6 / 6s / 7 / 8 — ou SE (2ª/3ª geração)'],
+    [414, 736,  3, 0, 'iPhone 6 Plus / 6s Plus / 7 Plus / 8 Plus'],
+    [375, 812,  3, 0, 'iPhone X / XS / 11 Pro — ou 12 mini / 13 mini'],
+    [414, 896,  2, 0, 'iPhone XR / 11'],
+    [414, 896,  3, 0, 'iPhone XS Max / 11 Pro Max'],
+    [390, 844,  3, 0, 'iPhone 12 / 12 Pro / 13 / 13 Pro / 14'],
+    [428, 926,  3, 0, 'iPhone 12 Pro Max / 13 Pro Max / 14 Plus'],
+    [393, 852,  3, 0, 'iPhone 14 Pro / 15 / 15 Pro / 16 / 16 Pro'],
+    [430, 932,  3, 0, 'iPhone 14 Pro Max / 15 Plus / 15 Pro Max / 16 Plus / 16 Pro Max'],
+  ];
+  for (const [tw, th, td, mc, label] of T) {
+    if (tw === pw && th === ph && td === d && cores >= mc) return label;
+  }
+  // fallback sem cores
+  for (const [tw, th, td, , label] of T) {
+    if (tw === pw && th === ph && td === d) return `${label} (aprox.)`;
+  }
+  return `iPhone — resolução ${pw}×${ph} DPR ${dpr} não mapeada`;
+}
+
+/** Tabela iPad: [largura-retrato, altura-retrato, DPR, rótulo] */
+function _detectIpad(pw, ph, dpr) {
+  const d = Math.round(dpr);
+  const T = [
+    [768,  1024, 2, 'iPad / iPad mini (geração antiga)'],
+    [744,  1133, 2, 'iPad mini (6ª geração)'],
+    [810,  1080, 2, 'iPad (7ª / 8ª / 9ª geração)'],
+    [820,  1180, 2, 'iPad (10ª geração) / iPad Air (4ª / 5ª geração)'],
+    [834,  1112, 2, 'iPad Air (3ª geração) / iPad Pro 10.5"'],
+    [834,  1194, 2, 'iPad Pro 11" (1ª – 4ª geração)'],
+    [1024, 1366, 2, 'iPad Pro 12.9" (qualquer geração)'],
+  ];
+  for (const [tw, th, td, label] of T) {
+    if (tw === pw && th === ph && td === d) return label;
+  }
+  return `iPad — resolução ${pw}×${ph} DPR ${dpr} não mapeada`;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * RENDER — Device Card
+ * ───────────────────────────────────────────────────────────────────────────── */
+
+async function renderDeviceCard() {
   // ── User Agent parsing ───────────────────────────────────────────────────
   const ua  = navigator.userAgent;
   let browser = 'Desconhecido', browserVer = '', os = 'Desconhecido';
@@ -469,9 +577,18 @@ function renderDeviceCard() {
   const colorDepth  = `${screen.colorDepth}-bit`;
   const cookiesOk   = navigator.cookieEnabled ? 'Habilitados' : 'Desabilitados';
   const doNotTrack  = navigator.doNotTrack === '1' ? 'Ativado' : navigator.doNotTrack === '0' ? 'Desativado' : 'Não definido';
+  const platRaw = navigator.platform || '—';
 
+  // ── Modelo do dispositivo (async) ─────────────────────────────────────────
+  const confColor = { 'Alta': 'green', 'Média': 'yellow', 'Baixa': 'gray' };
+
+  // Renderiza estrutura imediatamente com placeholder para o modelo
   document.getElementById('deviceBody').innerHTML = `
     <div class="data-grid data-grid--wide">
+      <div class="data-item data-item--full" id="deviceModelRow">
+        <span class="data-label">Modelo do dispositivo</span>
+        <span class="data-value"><span class="spinner spinner--sm" style="display:inline-block;vertical-align:middle;margin-right:6px"></span>Detectando…</span>
+      </div>
       <div class="data-item">
         <span class="data-label">Navegador</span>
         <span class="data-value">${escHtml(browser)} <span class="data-value--mono" style="font-size:.76rem">${escHtml(browserVer)}</span></span>
@@ -491,6 +608,10 @@ function renderDeviceCard() {
       <div class="data-item">
         <span class="data-label">Resolução / DPR</span>
         <span class="data-value data-value--mono">${escHtml(screen_info)}</span>
+      </div>
+      <div class="data-item">
+        <span class="data-label">Platform</span>
+        <span class="data-value data-value--mono">${escHtml(platRaw)}</span>
       </div>
       <div class="data-item">
         <span class="data-label">Profundidade de cor</span>
@@ -517,6 +638,279 @@ function renderDeviceCard() {
         <span class="data-value data-value--mono" style="font-size:.72rem;word-break:break-all">${escHtml(ua)}</span>
       </div>
     </div>`;
+
+  // Preenche modelo assim que detectar
+  detectDeviceModel().then(({ model, confidence, method }) => {
+    const row = document.getElementById('deviceModelRow');
+    if (!row) return;
+    const color = confColor[confidence] || 'gray';
+    row.innerHTML =
+      `<span class="data-label">Modelo do dispositivo</span>` +
+      `<span class="data-value" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">` +
+      `<strong>${escHtml(model)}</strong>` +
+      `<span class="badge badge--${color}" title="Confiança: ${escHtml(confidence)} — via ${escHtml(method)}">${escHtml(confidence)}</span>` +
+      `<span style="font-size:.72rem;color:var(--text-muted)">via ${escHtml(method)}</span>` +
+      `</span>`;
+  });
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * FINGERPRINT & AUDITORIA
+ * WebGL GPU · Canvas hash · Audio hash · Bateria · Sensores · Timestamp
+ * ───────────────────────────────────────────────────────────────────────────── */
+
+async function renderFingerprintCard() {
+  const results = await Promise.allSettled([
+    _fpWebGL(),
+    _fpCanvas(),
+    _fpAudio(),
+    _fpBattery(),
+    _fpSensors(),
+  ]);
+
+  const [webgl, canvas, audio, battery, sensors] = results.map(r =>
+    r.status === 'fulfilled' ? r.value : { error: r.reason?.message || 'Erro' }
+  );
+
+  const now   = new Date();
+  const tz    = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const tzOff = now.getTimezoneOffset();
+  const tzStr = `UTC${tzOff <= 0 ? '+' : '−'}${String(Math.abs(tzOff) / 60).padStart(2, '0')}:${String(Math.abs(tzOff) % 60).padStart(2, '0')}`;
+
+  // Compõe fingerprint ID combinando hashes disponíveis
+  const fpRaw   = [canvas.hash || '', audio.hash || '', webgl.renderer || ''].join('|');
+  const fpHash  = await _sha256short(fpRaw);
+
+  setBadge('fpBadge', 'blue', fpHash);
+
+  document.getElementById('fpBody').innerHTML = `
+
+    <!-- ── Fingerprint ID ── -->
+    <p class="fp-section-title">🆔 Fingerprint ID</p>
+    <div class="fp-audit-box" style="margin-bottom:1rem">
+      <strong>Hash composto (Canvas + Audio + GPU)</strong>
+      ${escHtml(fpHash)} &nbsp;<span style="opacity:.55;font-size:.7rem">SHA-256 truncado (12 chars)</span>
+    </div>
+
+    <!-- ── GPU ── -->
+    <p class="fp-section-title">🖥️ GPU / WebGL</p>
+    <div class="fp-grid">
+      <div class="fp-item">
+        <span class="fp-label">Vendor</span>
+        <span class="fp-value">${escHtml(webgl.vendor || webgl.error || '—')}</span>
+      </div>
+      <div class="fp-item">
+        <span class="fp-label">Renderer (modelo GPU)</span>
+        <span class="fp-value">${escHtml(webgl.renderer || webgl.error || '—')}</span>
+      </div>
+      <div class="fp-item">
+        <span class="fp-label">Versão WebGL</span>
+        <span class="fp-value">${escHtml(webgl.version || '—')}</span>
+      </div>
+      <div class="fp-item">
+        <span class="fp-label">Max Textura (px)</span>
+        <span class="fp-value">${escHtml(String(webgl.maxTexture || '—'))}</span>
+      </div>
+    </div>
+
+    <!-- ── Hashes ── -->
+    <p class="fp-section-title">🔒 Hashes de Hardware</p>
+    <div class="fp-hash-row">
+      <div class="fp-item">
+        <span class="fp-label">Canvas fingerprint</span>
+        <span class="fp-value fp-value--mono">${escHtml(canvas.hash || canvas.error || '—')}</span>
+        <span style="font-size:.68rem;color:var(--text-muted)">${canvas.hash ? 'Renderização única por GPU+fonte+OS' : ''}</span>
+      </div>
+      <div class="fp-item">
+        <span class="fp-label">Audio fingerprint</span>
+        <span class="fp-value fp-value--mono">${escHtml(audio.hash || audio.error || '—')}</span>
+        <span style="font-size:.68rem;color:var(--text-muted)">${audio.hash ? 'Processamento de áudio único por hardware' : ''}</span>
+      </div>
+      <div class="fp-item">
+        <span class="fp-label">GPU fingerprint</span>
+        <span class="fp-value fp-value--mono">${escHtml(webgl.hash || webgl.error || '—')}</span>
+        <span style="font-size:.68rem;color:var(--text-muted)">${webgl.hash ? 'Hash do renderer WebGL' : ''}</span>
+      </div>
+    </div>
+
+    <!-- ── Bateria ── -->
+    <p class="fp-section-title">🔋 Bateria</p>
+    <div class="fp-grid">
+      ${battery.error
+        ? `<div class="fp-item"><span class="fp-label">Status</span><span class="fp-value" style="color:var(--text-muted)">${escHtml(battery.error)}</span></div>`
+        : `
+      <div class="fp-item">
+        <span class="fp-label">Nível</span>
+        <span class="fp-value">${escHtml(battery.levelPct)}%
+          <span style="font-size:.7rem;margin-left:4px;color:var(--text-muted)">${battery.charging ? '⚡ Carregando' : '🔌 Desconectado'}</span>
+        </span>
+      </div>
+      <div class="fp-item">
+        <span class="fp-label">Tempo p/ carregar</span>
+        <span class="fp-value">${escHtml(battery.chargingTimeStr)}</span>
+      </div>
+      <div class="fp-item">
+        <span class="fp-label">Tempo restante</span>
+        <span class="fp-value">${escHtml(battery.dischargingTimeStr)}</span>
+      </div>`
+      }
+    </div>
+
+    <!-- ── Sensores ── -->
+    <p class="fp-section-title">📱 Sensores de Movimento</p>
+    <div style="margin-bottom:1rem">
+      <div class="fp-sensor-row">
+        <span class="fp-sensor-dot fp-sensor-dot--${sensors.motionSupported ? 'green' : 'gray'}"></span>
+        <span>Acelerômetro (DeviceMotion): <strong>${sensors.motionSupported ? 'Suportado' : 'Não suportado'}</strong>${sensors.motionPermission ? ` — ${escHtml(sensors.motionPermission)}` : ''}</span>
+      </div>
+      <div class="fp-sensor-row">
+        <span class="fp-sensor-dot fp-sensor-dot--${sensors.orientationSupported ? 'green' : 'gray'}"></span>
+        <span>Giroscópio (DeviceOrientation): <strong>${sensors.orientationSupported ? 'Suportado' : 'Não suportado'}</strong></span>
+      </div>
+      ${sensors.alpha !== null
+        ? `<div class="fp-sensor-row">
+            <span class="fp-sensor-dot fp-sensor-dot--green"></span>
+            <span>Leitura atual — α: <strong>${escHtml(sensors.alpha)}°</strong> &nbsp; β: <strong>${escHtml(sensors.beta)}°</strong> &nbsp; γ: <strong>${escHtml(sensors.gamma)}°</strong></span>
+           </div>`
+        : ''}
+    </div>
+
+    <!-- ── Timestamp de auditoria ── -->
+    <p class="fp-section-title">🕐 Timestamp de Auditoria</p>
+    <div class="fp-audit-box">
+      <strong>Registro do momento de acesso</strong>
+      ISO 8601 (UTC):&nbsp;&nbsp; ${escHtml(now.toISOString())}<br>
+      Local:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${escHtml(now.toLocaleString('pt-BR'))}<br>
+      Fuso horário:&nbsp;&nbsp;&nbsp;&nbsp; ${escHtml(tz)} (${escHtml(tzStr)})<br>
+      Unix timestamp:&nbsp;&nbsp; ${now.getTime()}
+    </div>
+  `;
+}
+
+// ── WebGL info ────────────────────────────────────────────────────────────────
+async function _fpWebGL() {
+  const canvas = document.createElement('canvas');
+  const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+  if (!gl) throw new Error('WebGL não suportado');
+
+  const ext = gl.getExtension('WEBGL_debug_renderer_info');
+  const vendor   = ext ? gl.getParameter(ext.UNMASKED_VENDOR_WEBGL)   : gl.getParameter(gl.VENDOR);
+  const renderer = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+  const version  = gl.getParameter(gl.VERSION);
+  const maxTexture = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+  const hash = await _sha256short(vendor + '|' + renderer);
+  return { vendor, renderer, version, maxTexture, hash };
+}
+
+// ── Canvas fingerprint ────────────────────────────────────────────────────────
+async function _fpCanvas() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 280; canvas.height = 60;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#1c2128';
+  ctx.fillRect(0, 0, 280, 60);
+
+  ctx.font = '18px Arial, sans-serif';
+  ctx.fillStyle = '#58a6ff';
+  ctx.fillText('Fingerprint 🔑 canvas', 8, 28);
+
+  ctx.font = '13px Georgia, serif';
+  ctx.fillStyle = '#3fb950';
+  ctx.fillText('Auditoria 1234 @#$!', 8, 50);
+
+  // Formas geométricas para capturar diferenças de renderização
+  ctx.beginPath();
+  ctx.arc(260, 30, 18, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(248,81,73,0.5)';
+  ctx.fill();
+
+  const dataUrl = canvas.toDataURL();
+  const hash = await _sha256short(dataUrl);
+  return { hash };
+}
+
+// ── Audio fingerprint ─────────────────────────────────────────────────────────
+async function _fpAudio() {
+  const ctx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 44100, 44100);
+  const osc = ctx.createOscillator();
+  const cmp = ctx.createDynamicsCompressor();
+
+  osc.type = 'triangle';
+  osc.frequency.value = 10000;
+  cmp.threshold.value = -50;
+  cmp.knee.value       = 40;
+  cmp.ratio.value      = 12;
+  cmp.attack.value     = 0;
+  cmp.release.value    = 0.25;
+
+  osc.connect(cmp);
+  cmp.connect(ctx.destination);
+  osc.start(0);
+
+  const buffer = await ctx.startRendering();
+  const data   = buffer.getChannelData(0);
+  // Pega amostra do meio para estabilidade
+  let sum = 0;
+  for (let i = 4500; i < 5000; i++) sum += Math.abs(data[i]);
+  const raw  = sum.toString();
+  const hash = await _sha256short(raw);
+  return { hash, raw: sum.toFixed(10) };
+}
+
+// ── Bateria ───────────────────────────────────────────────────────────────────
+async function _fpBattery() {
+  if (!navigator.getBattery) throw new Error('API não disponível neste browser (iOS/Firefox)');
+  const bat = await navigator.getBattery();
+  const fmt = s => s === Infinity ? '—' : `${Math.floor(s / 60)}min`;
+  return {
+    levelPct:           Math.round(bat.level * 100),
+    charging:           bat.charging,
+    chargingTimeStr:    fmt(bat.chargingTime),
+    dischargingTimeStr: fmt(bat.dischargingTime),
+  };
+}
+
+// ── Sensores de movimento ────────────────────────────────────────────────────
+async function _fpSensors() {
+  const result = {
+    motionSupported:      'DeviceMotionEvent'      in window,
+    orientationSupported: 'DeviceOrientationEvent' in window,
+    motionPermission: null,
+    alpha: null, beta: null, gamma: null,
+  };
+
+  // iOS 13+ requer permissão explícita
+  if (typeof DeviceOrientationEvent !== 'undefined' &&
+      typeof DeviceOrientationEvent.requestPermission === 'function') {
+    result.motionPermission = 'Requer permissão (iOS)';
+  } else if (result.orientationSupported) {
+    // Tenta ler uma amostra por 500ms
+    await new Promise(resolve => {
+      const handler = (e) => {
+        if (e.alpha !== null) {
+          result.alpha = e.alpha?.toFixed(1);
+          result.beta  = e.beta?.toFixed(1);
+          result.gamma = e.gamma?.toFixed(1);
+        }
+        window.removeEventListener('deviceorientation', handler);
+        resolve();
+      };
+      window.addEventListener('deviceorientation', handler);
+      setTimeout(resolve, 500);
+    });
+  }
+  return result;
+}
+
+// ── SHA-256 truncado (12 chars hex) ──────────────────────────────────────────
+async function _sha256short(str) {
+  const buf    = new TextEncoder().encode(str);
+  const digest = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(digest))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
+    .slice(0, 12);
 }
 
 function formatCoord(v) {
