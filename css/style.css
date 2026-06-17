@@ -121,7 +121,7 @@ body {
 
 /* ── Summary Banner ────────────────────────────────────────────────────────── */
 .summary-banner {
-  background: linear-gradient(135deg, #1c2128 0%, #161b22 100%);
+  background: var(--bg-card);
   border: 1px solid var(--border-default);
   border-radius: var(--radius);
   padding: 1.25rem 1.75rem;
@@ -593,6 +593,47 @@ body {
 @media (max-width: 768px) {
   .fp-hash-row { grid-template-columns: 1fr; }
 }
+
+/* ── Light theme ───────────────────────────────────────────────────────────── */
+[data-theme="light"] {
+  --bg-base:         #f6f8fa;
+  --bg-surface:      #ffffff;
+  --bg-card:         #ffffff;
+  --bg-card-hover:   #f6f8fa;
+  --border-subtle:   rgba(31, 35, 40, 0.07);
+  --border-default:  rgba(31, 35, 40, 0.15);
+  --text-primary:    #1f2328;
+  --text-secondary:  #656d76;
+  --text-muted:      #8b949e;
+  --gray-bg:         rgba(110, 118, 129, 0.06);
+  --shadow-card:       0 1px 3px rgba(0,0,0,.07), 0 4px 12px rgba(0,0,0,.04);
+  --shadow-card-hover: 0 2px 6px rgba(0,0,0,.10), 0 8px 24px rgba(0,0,0,.06);
+}
+
+body,
+.card,
+.summary-banner,
+.app-header,
+.privacy-notice,
+.fp-audit-box,
+.fp-sensor-row { transition: background-color .25s ease, border-color .25s ease, color .25s ease; }
+
+/* ── Theme Toggle Button ───────────────────────────────────────────────────── */
+.btn-theme {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background .2s, border-color .2s;
+  flex-shrink: 0;
+}
+.btn-theme:hover { background: var(--bg-card-hover); }
+
+/* ── Small button variant ──────────────────────────────────────────────────── */
+.btn-xs { padding: 4px 10px; font-size: 0.74rem; }
 
 /* ── Footer ────────────────────────────────────────────────────────────────── */
 .app-footer {

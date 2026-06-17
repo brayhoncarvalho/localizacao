@@ -16,6 +16,7 @@ const state = {
   ipData:    null,
   gpsCoords: null,
   gpsAddress: null,
+  fpData:    null,
 };
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -108,6 +109,27 @@ async function fetchIPLocation() {
         regionName: r.regionName, city: r.cityName, zip: r.zipCode,
         lat: r.latitude, lon: r.longitude, timezone: r.timeZone,
         isp: '', org: '', as: '',
+      };
+    },
+    // 5ª opção: ipify (só retorna o IP) + geojs para geolocalização — muito tolerante com VPN
+    async () => {
+      const [rIp, rGeo] = await Promise.all([
+        fetchWithTimeout('https://api.ipify.org?format=json', 8000).then(r => r.json()),
+        fetchWithTimeout('https://get.geojs.io/v1/ip/geo.json', 8000).then(r => r.json()),
+      ]);
+      return {
+        query: rIp.ip, country: rGeo.country, countryCode: rGeo.country_code,
+        regionName: rGeo.region, city: rGeo.city, zip: '',
+        lat: parseFloat(rGeo.latitude) || null, lon: parseFloat(rGeo.longitude) || null,
+        timezone: rGeo.timezone, isp: rGeo.organization_name || '', org: '', as: '',
+      };
+    },
+    // 6ª opção: ipify puro (garantia mínima — mostra só o IP mesmo sem geoloc)
+    async () => {
+      const r = await fetchWithTimeout('https://api.ipify.org?format=json', 8000).then(res => res.json());
+      return {
+        query: r.ip, country: '—', countryCode: '', regionName: '', city: 'VPN ativa (geoloc indisponível)',
+        zip: '', lat: null, lon: null, timezone: '', isp: '', org: '', as: '',
       };
     },
   ];
@@ -545,10 +567,15 @@ async function renderDeviceCard() {
   const ua  = navigator.userAgent;
   let browser = 'Desconhecido', browserVer = '', os = 'Desconhecido';
 
-  // Browser
-  if (/Edg\/(\S+)/.test(ua))            { browser = 'Microsoft Edge';  browserVer = RegExp.$1; }
-  else if (/Chrome\/(\S+)/.test(ua))    { browser = 'Chrome';          browserVer = RegExp.$1; }
-  else if (/Firefox\/(\S+)/.test(ua))   { browser = 'Firefox';         browserVer = RegExp.$1; }
+  // Browser — iOS browsers usam WebKit mas expõem seu token no UA
+  if      (/CriOS\/(\S+)/.test(ua))           { browser = 'Chrome (iOS)';     browserVer = RegExp.$1; }
+  else if (/FxiOS\/(\S+)/.test(ua))           { browser = 'Firefox (iOS)';    browserVer = RegExp.$1; }
+  else if (/EdgiOS\/(\S+)/.test(ua))          { browser = 'Edge (iOS)';       browserVer = RegExp.$1; }
+  else if (/OPiOS\/(\S+)/.test(ua))           { browser = 'Opera (iOS)';      browserVer = RegExp.$1; }
+  else if (/SamsungBrowser\/(\S+)/.test(ua))  { browser = 'Samsung Internet'; browserVer = RegExp.$1; }
+  else if (/Edg\/(\S+)/.test(ua))             { browser = 'Microsoft Edge';   browserVer = RegExp.$1; }
+  else if (/Chrome\/(\S+)/.test(ua))          { browser = 'Chrome';           browserVer = RegExp.$1; }
+  else if (/Firefox\/(\S+)/.test(ua))         { browser = 'Firefox';          browserVer = RegExp.$1; }
   else if (/Safari\/(\S+)/.test(ua) && !/Chrome/.test(ua)) {
     browser = 'Safari';
     const m = ua.match(/Version\/(\S+)/);
@@ -633,6 +660,14 @@ async function renderDeviceCard() {
         <span class="data-label">Do Not Track</span>
         <span class="data-value">${escHtml(doNotTrack)}</span>
       </div>
+      <div class="data-item" id="deviceStorageRow">
+        <span class="data-label">Armazenamento (quota)</span>
+        <span class="data-value"><span class="spinner spinner--sm" style="display:inline-block;vertical-align:middle;margin-right:4px"></span></span>
+      </div>
+      <div class="data-item" id="deviceMediaRow">
+        <span class="data-label">Câmeras / Microfones</span>
+        <span class="data-value"><span class="spinner spinner--sm" style="display:inline-block;vertical-align:middle;margin-right:4px"></span></span>
+      </div>
       <div class="data-item data-item--full">
         <span class="data-label">User Agent</span>
         <span class="data-value data-value--mono" style="font-size:.72rem;word-break:break-all">${escHtml(ua)}</span>
@@ -652,6 +687,40 @@ async function renderDeviceCard() {
       `<span style="font-size:.72rem;color:var(--text-muted)">via ${escHtml(method)}</span>` +
       `</span>`;
   });
+
+  // Storage quota
+  if (navigator.storage?.estimate) {
+    navigator.storage.estimate().then(({ quota, usage }) => {
+      const el = document.getElementById('deviceStorageRow');
+      if (!el) return;
+      const gb = v => (v / 1024 ** 3).toFixed(2);
+      el.querySelector('.data-value').textContent = `${gb(usage)} GB usados de ${gb(quota)} GB disponíveis`;
+    }).catch(() => {
+      const el = document.getElementById('deviceStorageRow');
+      if (el) el.querySelector('.data-value').textContent = 'Não disponível';
+    });
+  } else {
+    const el = document.getElementById('deviceStorageRow');
+    if (el) el.querySelector('.data-value').textContent = 'API não suportada';
+  }
+
+  // Media devices (sem solicitar stream)
+  if (navigator.mediaDevices?.enumerateDevices) {
+    navigator.mediaDevices.enumerateDevices().then(devices => {
+      const el = document.getElementById('deviceMediaRow');
+      if (!el) return;
+      const cams = devices.filter(d => d.kind === 'videoinput').length;
+      const mics = devices.filter(d => d.kind === 'audioinput').length;
+      const spks = devices.filter(d => d.kind === 'audiooutput').length;
+      el.querySelector('.data-value').textContent = `${cams} câmera(s) · ${mics} microfone(s) · ${spks} saída(s) de áudio`;
+    }).catch(() => {
+      const el = document.getElementById('deviceMediaRow');
+      if (el) el.querySelector('.data-value').textContent = 'Sem acesso (permissão necessária)';
+    });
+  } else {
+    const el = document.getElementById('deviceMediaRow');
+    if (el) el.querySelector('.data-value').textContent = 'API não suportada';
+  }
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -798,8 +867,9 @@ async function _fpWebGL() {
   const renderer = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
   const version  = gl.getParameter(gl.VERSION);
   const maxTexture = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+  const extensions = gl.getSupportedExtensions() || [];
   const hash = await _sha256short(vendor + '|' + renderer);
-  return { vendor, renderer, version, maxTexture, hash };
+  return { vendor, renderer, version, maxTexture, extensions: extensions.length, hash };
 }
 
 // ── Canvas fingerprint ────────────────────────────────────────────────────────
@@ -911,6 +981,164 @@ async function _sha256short(str) {
     .map(b => b.toString(16).padStart(2, '0'))
     .join('')
     .slice(0, 12);
+}
+
+// ── Font detection ────────────────────────────────────────────────────────────
+async function _fpFonts() {
+  const TEST = [
+    'Arial', 'Helvetica', 'Times New Roman', 'Courier New', 'Verdana',
+    'Georgia', 'Comic Sans MS', 'Trebuchet MS', 'Impact', 'Tahoma',
+    'Lucida Console', 'Monaco', 'SF Pro Display', 'SF Pro Text', 'Roboto',
+    'Ubuntu', 'Segoe UI', 'Calibri', 'Cambria', 'Open Sans',
+  ];
+  const c   = document.createElement('canvas');
+  const ctx = c.getContext('2d');
+  const p   = 'mmmmmmmmmmlli';
+  ctx.font = `16px monospace`; const wM = ctx.measureText(p).width;
+  ctx.font = `16px serif`;     const wS = ctx.measureText(p).width;
+  const found = TEST.filter(f => {
+    ctx.font = `16px '${f}', monospace`; const w1 = ctx.measureText(p).width;
+    ctx.font = `16px '${f}', serif`;     const w2 = ctx.measureText(p).width;
+    return w1 !== wM || w2 !== wS;
+  });
+  return { fonts: found, count: found.length, total: TEST.length };
+}
+
+// ── Bot / Emulator / Security detection ───────────────────────────────────────
+function _fpBot() {
+  const signals = [];
+
+  if (navigator.webdriver === true) {
+    signals.push({ label: 'navigator.webdriver = true — Selenium / Puppeteer detectado', severity: 'red' });
+  } else {
+    signals.push({ label: 'navigator.webdriver = false — não é bot automatizado', severity: 'green' });
+  }
+
+  const isMobileUA = /Mobile|Android|iPhone|iPad/i.test(navigator.userAgent);
+  if (isMobileUA && navigator.maxTouchPoints === 0) {
+    signals.push({ label: 'UA mobile mas maxTouchPoints = 0 — possível emulador ou bot', severity: 'red' });
+  }
+
+  if (window.outerWidth === 0 || window.outerHeight === 0) {
+    signals.push({ label: 'outerWidth / outerHeight = 0 — browser headless detectado', severity: 'red' });
+  }
+
+  const inIframe = (() => { try { return window.self !== window.top; } catch (_) { return true; } })();
+  if (inIframe) {
+    signals.push({ label: 'Página executando dentro de um <iframe>', severity: 'yellow' });
+  } else {
+    signals.push({ label: 'Janela principal (não está em iframe)', severity: 'green' });
+  }
+
+  const dtOpen = (window.outerWidth - window.innerWidth > 160) ||
+                 (window.outerHeight - window.innerHeight > 160);
+  if (dtOpen) {
+    signals.push({ label: 'DevTools possivelmente aberto (diferença outer↔inner > 160 px)', severity: 'yellow' });
+  } else {
+    signals.push({ label: 'DevTools não detectado', severity: 'green' });
+  }
+
+  const pluginCount = navigator.plugins?.length || 0;
+  const isDesktopChrome = !/Mobile|Android|iPhone|iPad/i.test(navigator.userAgent) && /Chrome/.test(navigator.userAgent);
+  if (isDesktopChrome && pluginCount === 0) {
+    signals.push({ label: `Plugins = 0 em Chrome desktop — comportamento de headless browser`, severity: 'yellow' });
+  }
+
+  return { signals };
+}
+
+// ── iOS sensor permission ─────────────────────────────────────────────────────
+async function requestSensorPermissionIOS() {
+  const btn = document.getElementById('sensorPermBtn');
+  const row = document.getElementById('sensorPermRow');
+  if (btn) { btn.disabled = true; btn.textContent = 'Aguardando…'; }
+  try {
+    const perm = await DeviceOrientationEvent.requestPermission();
+    if (perm === 'granted') {
+      if (row) row.innerHTML =
+        `<span class="fp-sensor-dot fp-sensor-dot--green"></span>
+         <span>Permissão concedida ✓ — aguardando leitura…</span>`;
+      const readingRow = document.getElementById('sensorReadingRow');
+      window.addEventListener('deviceorientation', function handler(e) {
+        if (!readingRow) { window.removeEventListener('deviceorientation', handler); return; }
+        readingRow.innerHTML =
+          `<div class="fp-sensor-row">
+             <span class="fp-sensor-dot fp-sensor-dot--green"></span>
+             <span>Leitura em tempo real — α: <strong>${e.alpha?.toFixed(1) ?? '—'}°</strong> &nbsp;
+               β: <strong>${e.beta?.toFixed(1) ?? '—'}°</strong> &nbsp;
+               γ: <strong>${e.gamma?.toFixed(1) ?? '—'}°</strong></span>
+           </div>`;
+      });
+    } else {
+      if (row) row.innerHTML =
+        `<span class="fp-sensor-dot fp-sensor-dot--red"></span><span>Permissão negada pelo usuário</span>`;
+    }
+  } catch (e) {
+    if (row) row.innerHTML =
+      `<span class="fp-sensor-dot fp-sensor-dot--red"></span><span>Erro: ${escHtml(e.message)}</span>`;
+  }
+}
+
+// ── Export audit report ───────────────────────────────────────────────────────
+function exportAuditReport() {
+  const report = {
+    generated_at:   new Date().toISOString(),
+    fingerprint_id: state.fpData?.fpHash || null,
+    ip:             state.ipData,
+    gps: state.gpsCoords ? {
+      latitude:  state.gpsCoords.latitude,
+      longitude: state.gpsCoords.longitude,
+      accuracy:  state.gpsCoords.accuracy,
+      altitude:  state.gpsCoords.altitude,
+    } : null,
+    gps_address: state.gpsAddress?.display_name || null,
+    fingerprint: state.fpData,
+    device: {
+      userAgent:           navigator.userAgent,
+      platform:            navigator.platform,
+      language:            navigator.language,
+      languages:           Array.from(navigator.languages || []),
+      hardwareConcurrency: navigator.hardwareConcurrency,
+      deviceMemory:        navigator.deviceMemory,
+      maxTouchPoints:      navigator.maxTouchPoints,
+      cookieEnabled:       navigator.cookieEnabled,
+      screen: {
+        width:      screen.width,
+        height:     screen.height,
+        dpr:        window.devicePixelRatio,
+        colorDepth: screen.colorDepth,
+      },
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    },
+  };
+  const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = `auditoria-${Date.now()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+}
+
+// ── Theme toggle ──────────────────────────────────────────────────────────────
+function toggleTheme() {
+  const html = document.documentElement;
+  const btn  = document.getElementById('themeToggle');
+  const isDark = html.dataset.theme === 'dark';
+  html.dataset.theme = isDark ? 'light' : 'dark';
+  if (btn) btn.textContent = isDark ? '☀️' : '🌙';
+}
+
+// ── Haversine distance ────────────────────────────────────────────────────────
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R    = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a    = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 function formatCoord(v) {

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -21,11 +21,14 @@
             <p class="header-subtitle">Diagnóstico de localização via GPS e IP</p>
           </div>
         </div>
-        <div class="privacy-notice">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="13" height="13">
-            <path fill-rule="evenodd" d="M12 1.5a5.25 5.25 0 00-5.25 5.25v3a3 3 0 00-3 3v6.75a3 3 0 003 3h10.5a3 3 0 003-3v-6.75a3 3 0 00-3-3v-3c0-2.9-2.35-5.25-5.25-5.25zm3.75 8.25v-3a3.75 3.75 0 10-7.5 0v3h7.5z" clip-rule="evenodd" />
-          </svg>
-          <span>Dados não armazenados nem transmitidos a servidores próprios</span>
+        <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
+          <div class="privacy-notice">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="13" height="13">
+              <path fill-rule="evenodd" d="M12 1.5a5.25 5.25 0 00-5.25 5.25v3a3 3 0 00-3 3v6.75a3 3 0 003 3h10.5a3 3 0 003-3v-6.75a3 3 0 00-3-3v-3c0-2.9-2.35-5.25-5.25-5.25zm3.75 8.25v-3a3.75 3.75 0 10-7.5 0v3h7.5z" clip-rule="evenodd" />
+            </svg>
+            <span>Dados não armazenados nem transmitidos a servidores próprios</span>
+          </div>
+          <button class="btn-theme" id="themeToggle" onclick="toggleTheme()" title="Alternar tema claro/escuro">🌙</button>
         </div>
       </div>
     </header>
@@ -76,7 +79,10 @@
                 <span class="card-icon">🌐</span>
                 <h2>Localização por IP</h2>
               </div>
-              <span class="badge" id="ipBadge"></span>
+              <div style="display:flex;align-items:center;gap:8px">
+                <span class="badge" id="fpBadge"></span>
+                <button class="btn-secondary btn-xs" onclick="exportAuditReport()" title="Exportar relatório JSON">⬇ Exportar</button>
+              </div>
             </div>
             <div class="card-body" id="ipBody">
               <div class="loading-state">
